@@ -2,6 +2,7 @@ class SecurityAssistantBackground {
   constructor() {
     this.isModelReady = false;
     this.modelEngine = null;
+    this.currentPageContext = null;
     this.init();
   }
 
@@ -61,6 +62,15 @@ class SecurityAssistantBackground {
           break;
         case 'SECURITY_ALERT':
           this.handleSecurityAlert(message.alertType, message.data);
+          sendResponse({ success: true });
+          break;
+        case 'PAGE_CONTEXT_FOR_CHAT':
+          this.handlePageContext(message.context);
+          // Forward to popup
+          this.broadcastToPopup({
+            type: 'PAGE_CONTEXT_FOR_CHAT',
+            context: message.context
+          });
           sendResponse({ success: true });
           break;
         default:
@@ -155,7 +165,13 @@ class SecurityAssistantBackground {
   }
 
   buildSecurityPrompt(userMessage) {
-    const systemPrompt = `You are a cybersecurity assistant. Provide helpful, accurate information about:
+    let contextInfo = '';
+    
+    if (this.currentPageContext) {
+      contextInfo = this.buildPageContextPrompt(this.currentPageContext);
+    }
+    
+    const systemPrompt = `You are a cybersecurity assistant with access to the current webpage's security context. Provide helpful, accurate information about:
 - Threat analysis and risk assessment
 - Security best practices
 - Vulnerability identification
@@ -163,13 +179,73 @@ class SecurityAssistantBackground {
 - URL and domain reputation analysis
 - Phishing and malware detection
 
-Keep responses concise and actionable. If analyzing potentially malicious content, clearly state the risks.
+${contextInfo}
+
+Keep responses concise and actionable. When analyzing the current page, reference specific security findings. If analyzing potentially malicious content, clearly state the risks.
 
 User question: ${userMessage}
 
 Response:`;
 
     return systemPrompt;
+  }
+
+  buildPageContextPrompt(context) {
+    const ctx = context;
+    let prompt = '\n--- CURRENT PAGE SECURITY CONTEXT ---\n';
+    
+    // Basic page info
+    prompt += `Page: ${ctx.basic.title} (${ctx.basic.url})\n`;
+    prompt += `Protocol: ${ctx.basic.protocol} (HTTPS: ${ctx.basic.isHTTPS})\n`;
+    
+    // Security findings
+    if (ctx.security.suspiciousElements && ctx.security.suspiciousElements.length > 0) {
+      prompt += `⚠️ SUSPICIOUS ELEMENTS DETECTED: ${ctx.security.suspiciousElements.length} found\n`;
+    }
+    
+    if (ctx.security.hasLoginForm) {
+      prompt += `🔐 Login form detected${!ctx.basic.isHTTPS ? ' (INSECURE - over HTTP!)' : ''}\n`;
+    }
+    
+    if (ctx.security.hasPaymentForm) {
+      prompt += `💳 Payment form detected${!ctx.basic.isHTTPS ? ' (CRITICAL RISK - over HTTP!)' : ''}\n`;
+    }
+    
+    // External resources
+    if (ctx.security.externalResources) {
+      const ext = ctx.security.externalResources;
+      if (ext.scripts.length > 0) {
+        prompt += `📜 External scripts: ${ext.scripts.length} (suspicious: ${ext.scripts.filter(s => s.suspicious).length})\n`;
+      }
+      if (ext.iframes.length > 0) {
+        prompt += `🖼️ iframes: ${ext.iframes.length} (suspicious: ${ext.iframes.filter(f => f.suspicious).length})\n`;
+      }
+    }
+    
+    // Links analysis
+    if (ctx.content.links) {
+      const links = ctx.content.links;
+      if (links.suspicious > 0) {
+        prompt += `🔗 SUSPICIOUS LINKS: ${links.suspicious} of ${links.total} total links\n`;
+      }
+      if (links.downloadLinks > 0) {
+        prompt += `📥 Download links: ${links.downloadLinks}\n`;
+      }
+    }
+    
+    // Page content summary
+    if (ctx.content.visibleText) {
+      prompt += `📄 Page content preview: "${ctx.content.visibleText.substring(0, 200)}..."\n`;
+    }
+    
+    prompt += '--- END CONTEXT ---\n\n';
+    
+    return prompt;
+  }
+
+  handlePageContext(context) {
+    this.currentPageContext = context;
+    console.log('Updated page context for security analysis:', context.basic.url);
   }
 
   handleInferenceResponse(response) {

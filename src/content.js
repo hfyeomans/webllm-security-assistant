@@ -40,6 +40,9 @@ class SecurityContentScript {
         case 'CHECK_URL':
           this.analyzeCurrentURL();
           break;
+        case 'GET_PAGE_CONTEXT':
+          this.getPageContextForChat();
+          break;
       }
     });
   }
@@ -417,6 +420,304 @@ class SecurityContentScript {
     });
     
     console.warn(`[Security Alert] ${alertType}:`, data);
+  }
+
+  getPageContextForChat() {
+    const context = this.extractComprehensivePageContext();
+    
+    chrome.runtime.sendMessage({
+      type: 'PAGE_CONTEXT_FOR_CHAT',
+      context: context
+    });
+  }
+
+  extractComprehensivePageContext() {
+    const context = {
+      basic: {
+        title: document.title,
+        url: window.location.href,
+        domain: window.location.hostname,
+        protocol: window.location.protocol,
+        isHTTPS: window.location.protocol === 'https:',
+        timestamp: Date.now()
+      },
+      security: {
+        hasPasswordFields: document.querySelectorAll('input[type="password"]').length > 0,
+        hasEmailFields: document.querySelectorAll('input[type="email"], input[name*="email"]').length > 0,
+        hasLoginForm: this.hasLoginForm(),
+        hasPaymentForm: this.hasPaymentForm(),
+        suspiciousElements: this.findSuspiciousElements(),
+        externalResources: this.getExternalResources(),
+        formAnalysis: this.analyzeForm()
+      },
+      content: {
+        headings: this.extractHeadings(),
+        visibleText: this.getVisibleTextSample(),
+        links: this.analyzeLinks(),
+        images: this.analyzeImages(),
+        socialMediaElements: this.findSocialMediaElements()
+      },
+      technical: {
+        frameworks: this.detectFrameworks(),
+        cookieInfo: this.getCookieInfo(),
+        storageUsage: this.getStorageUsage(),
+        httpHeaders: this.getVisibleHeaders()
+      }
+    };
+
+    return context;
+  }
+
+  hasLoginForm() {
+    const forms = document.querySelectorAll('form');
+    for (const form of forms) {
+      const passwordFields = form.querySelectorAll('input[type="password"]');
+      const usernameFields = form.querySelectorAll('input[type="email"], input[name*="user"], input[name*="email"], input[name*="login"]');
+      if (passwordFields.length > 0 && usernameFields.length > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  hasPaymentForm() {
+    const paymentSelectors = [
+      'input[name*="card"]',
+      'input[name*="credit"]',
+      'input[name*="payment"]',
+      'input[name*="billing"]',
+      'input[placeholder*="card"]',
+      'input[placeholder*="credit"]',
+      '[class*="payment"]',
+      '[class*="checkout"]',
+      '[class*="billing"]'
+    ];
+    
+    return paymentSelectors.some(selector => document.querySelector(selector) !== null);
+  }
+
+  getExternalResources() {
+    const resources = {
+      scripts: [],
+      stylesheets: [],
+      images: [],
+      iframes: []
+    };
+
+    // External scripts
+    document.querySelectorAll('script[src]').forEach(script => {
+      if (!script.src.startsWith(window.location.origin)) {
+        resources.scripts.push({
+          src: script.src,
+          suspicious: this.isSuspiciousURL(script.src)
+        });
+      }
+    });
+
+    // External stylesheets
+    document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+      if (link.href && !link.href.startsWith(window.location.origin)) {
+        resources.stylesheets.push({
+          href: link.href,
+          suspicious: this.isSuspiciousURL(link.href)
+        });
+      }
+    });
+
+    // External images
+    document.querySelectorAll('img[src]').forEach(img => {
+      if (!img.src.startsWith(window.location.origin) && !img.src.startsWith('data:')) {
+        resources.images.push({
+          src: img.src,
+          alt: img.alt || '',
+          suspicious: this.isSuspiciousURL(img.src)
+        });
+      }
+    });
+
+    // Iframes
+    document.querySelectorAll('iframe[src]').forEach(iframe => {
+      resources.iframes.push({
+        src: iframe.src,
+        suspicious: this.isSuspiciousURL(iframe.src)
+      });
+    });
+
+    return resources;
+  }
+
+  extractHeadings() {
+    const headings = [];
+    const headingElements = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    
+    headingElements.forEach(heading => {
+      headings.push({
+        level: heading.tagName.toLowerCase(),
+        text: heading.textContent.trim().substring(0, 100)
+      });
+    });
+
+    return headings.slice(0, 10); // Limit to first 10 headings
+  }
+
+  getVisibleTextSample() {
+    const bodyText = document.body.textContent || document.body.innerText || '';
+    const cleanText = bodyText.replace(/\s+/g, ' ').trim();
+    return cleanText.substring(0, 500); // First 500 characters
+  }
+
+  analyzeLinks() {
+    const links = document.querySelectorAll('a[href]');
+    const linkAnalysis = {
+      total: links.length,
+      external: 0,
+      suspicious: 0,
+      mailto: 0,
+      tel: 0,
+      downloadLinks: 0
+    };
+
+    links.forEach(link => {
+      const href = link.href;
+      
+      if (href.startsWith('mailto:')) {
+        linkAnalysis.mailto++;
+      } else if (href.startsWith('tel:')) {
+        linkAnalysis.tel++;
+      } else if (!href.startsWith(window.location.origin) && 
+                 !href.startsWith('/') && 
+                 !href.startsWith('#')) {
+        linkAnalysis.external++;
+        
+        if (this.isSuspiciousURL(href)) {
+          linkAnalysis.suspicious++;
+        }
+      }
+
+      // Check for download links
+      if (href.includes('download') || 
+          link.download || 
+          /\.(exe|msi|dmg|pkg|deb|zip|rar|7z)$/i.test(href)) {
+        linkAnalysis.downloadLinks++;
+      }
+    });
+
+    return linkAnalysis;
+  }
+
+  analyzeImages() {
+    const images = document.querySelectorAll('img');
+    return {
+      total: images.length,
+      withoutAlt: Array.from(images).filter(img => !img.alt || img.alt.trim() === '').length,
+      external: Array.from(images).filter(img => 
+        img.src && 
+        !img.src.startsWith(window.location.origin) && 
+        !img.src.startsWith('data:')
+      ).length
+    };
+  }
+
+  findSocialMediaElements() {
+    const socialSelectors = [
+      '[class*="facebook"]', '[href*="facebook.com"]',
+      '[class*="twitter"]', '[href*="twitter.com"]', '[href*="x.com"]',
+      '[class*="instagram"]', '[href*="instagram.com"]',
+      '[class*="linkedin"]', '[href*="linkedin.com"]',
+      '[class*="social"]'
+    ];
+
+    const socialElements = socialSelectors.some(selector => 
+      document.querySelector(selector) !== null
+    );
+
+    return {
+      hasSocialElements: socialElements,
+      shareButtons: document.querySelectorAll('[class*="share"], [class*="Share"]').length
+    };
+  }
+
+  detectFrameworks() {
+    const frameworks = [];
+    
+    // React
+    if (document.querySelector('#root') || 
+        document.querySelector('[data-reactroot]') ||
+        window.React) {
+      frameworks.push('React');
+    }
+
+    // Vue
+    if (window.Vue || document.querySelector('[data-v-]')) {
+      frameworks.push('Vue');
+    }
+
+    // Angular
+    if (window.angular || document.querySelector('[ng-app]') || 
+        document.querySelector('[data-ng-app]')) {
+      frameworks.push('Angular');
+    }
+
+    // jQuery
+    if (window.jQuery || window.$) {
+      frameworks.push('jQuery');
+    }
+
+    // Bootstrap
+    if (document.querySelector('.container') || 
+        document.querySelector('.row') ||
+        document.querySelector('.col-')) {
+      frameworks.push('Bootstrap (possible)');
+    }
+
+    return frameworks;
+  }
+
+  getCookieInfo() {
+    const cookies = document.cookie.split(';');
+    return {
+      count: cookies.filter(cookie => cookie.trim() !== '').length,
+      hasCookies: document.cookie.length > 0,
+      names: cookies.slice(0, 5).map(cookie => {
+        const [name] = cookie.split('=');
+        return name.trim();
+      })
+    };
+  }
+
+  getStorageUsage() {
+    try {
+      return {
+        localStorage: localStorage.length,
+        sessionStorage: sessionStorage.length,
+        hasStorage: localStorage.length > 0 || sessionStorage.length > 0
+      };
+    } catch (e) {
+      return {
+        localStorage: 0,
+        sessionStorage: 0,
+        hasStorage: false,
+        error: 'Storage access denied'
+      };
+    }
+  }
+
+  getVisibleHeaders() {
+    const metaTags = {};
+    document.querySelectorAll('meta[name], meta[property]').forEach(meta => {
+      const key = meta.name || meta.property;
+      if (key && meta.content) {
+        metaTags[key] = meta.content.substring(0, 100); // Limit content length
+      }
+    });
+
+    return {
+      title: document.title,
+      description: metaTags.description || '',
+      keywords: metaTags.keywords || '',
+      viewport: metaTags.viewport || '',
+      author: metaTags.author || ''
+    };
   }
 }
 

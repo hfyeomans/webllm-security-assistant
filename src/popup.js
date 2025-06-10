@@ -2,6 +2,7 @@ class SecurityAssistantPopup {
   constructor() {
     this.messages = [];
     this.isModelReady = false;
+    this.hasPageContext = false;
     this.init();
   }
 
@@ -18,6 +19,7 @@ class SecurityAssistantPopup {
     this.messageInput = document.getElementById('messageInput');
     this.sendButton = document.getElementById('sendButton');
     this.modelInfo = document.getElementById('modelInfo');
+    this.pageContextIndicator = document.getElementById('pageContext');
   }
 
   setupEventListeners() {
@@ -45,6 +47,9 @@ class SecurityAssistantPopup {
         case 'SECURITY_ALERT_NOTIFICATION':
           this.showSecurityAlert(message);
           break;
+        case 'PAGE_CONTEXT_FOR_CHAT':
+          this.handlePageContext(message.context);
+          break;
       }
     });
   }
@@ -55,8 +60,23 @@ class SecurityAssistantPopup {
         type: 'INIT_MODEL'
       });
       this.updateModelStatus('loading', 'Initializing model...');
+      
+      // Request page context after initialization
+      this.requestPageContext();
     } catch (error) {
       this.updateModelStatus('error', 'Failed to initialize');
+    }
+  }
+
+  async requestPageContext() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab) {
+        chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_CONTEXT' });
+        this.updatePageContextStatus('Loading page context...');
+      }
+    } catch (error) {
+      console.error('Failed to request page context:', error);
     }
   }
 
@@ -196,6 +216,81 @@ class SecurityAssistantPopup {
         banner.remove();
       }
     }, 10000);
+  }
+
+  handlePageContext(context) {
+    this.hasPageContext = true;
+    this.updatePageContextStatus('Page context loaded');
+    
+    // Add initial context message
+    this.addContextMessage(context);
+  }
+
+  updatePageContextStatus(status) {
+    if (this.pageContextIndicator) {
+      this.pageContextIndicator.textContent = status;
+      this.pageContextIndicator.className = this.hasPageContext ? 'context-loaded' : 'context-loading';
+    }
+  }
+
+  addContextMessage(context) {
+    const securitySummary = this.buildSecuritySummary(context);
+    this.addMessage('system', `Page Security Analysis: ${securitySummary}`);
+    
+    // Add helpful suggestions
+    this.addMessage('system', 'I now have context about this page. You can ask questions like: "Is this page safe?", "Should I trust this form?", or "Are there any security risks here?"');
+  }
+
+  buildSecuritySummary(context) {
+    const issues = [];
+    const positives = [];
+    
+    // Check for security issues
+    if (!context.basic.isHTTPS) {
+      issues.push('insecure HTTP connection');
+    }
+    
+    if (context.security.hasLoginForm && !context.basic.isHTTPS) {
+      issues.push('login form over insecure connection');
+    }
+    
+    if (context.security.hasPaymentForm && !context.basic.isHTTPS) {
+      issues.push('payment form over insecure connection');
+    }
+    
+    if (context.security.suspiciousElements && context.security.suspiciousElements.length > 0) {
+      issues.push(`${context.security.suspiciousElements.length} suspicious elements`);
+    }
+    
+    if (context.content.links.suspicious > 0) {
+      issues.push(`${context.content.links.suspicious} suspicious links`);
+    }
+    
+    // Check for positive security indicators
+    if (context.basic.isHTTPS) {
+      positives.push('secure HTTPS connection');
+    }
+    
+    if (context.security.hasLoginForm && context.basic.isHTTPS) {
+      positives.push('secure login form');
+    }
+    
+    let summary = '';
+    
+    if (issues.length > 0) {
+      summary += `⚠️ Issues: ${issues.join(', ')}`;
+    }
+    
+    if (positives.length > 0) {
+      if (summary) summary += ' | ';
+      summary += `✅ Good: ${positives.join(', ')}`;
+    }
+    
+    if (!summary) {
+      summary = '✅ No obvious security issues detected';
+    }
+    
+    return summary;
   }
 }
 

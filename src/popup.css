@@ -45,6 +45,26 @@ header h1 {
   color: #c62828;
 }
 
+.page-context {
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  background: #f3e5f5;
+  color: #7b1fa2;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.page-context.context-loaded {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.page-context.context-loading {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
 .chat-container {
   flex: 1;
   display: flex;
