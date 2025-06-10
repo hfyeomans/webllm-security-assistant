@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HTTP Login Test Page</title>
+</head>
+<body>
+    <h1>Insecure Login Form Test</h1>
+    <p>This page simulates an insecure login form over HTTP</p>
+    
+    <form action="http://httpbin.org/post" method="post">
+        <div>
+            <label>Username:</label>
+            <input type="text" name="username" placeholder="Enter username">
+        </div>
+        <div>
+            <label>Password:</label>
+            <input type="password" name="password" placeholder="Enter password">
+        </div>
+        <button type="submit">Login</button>
+    </form>
+    
+    <h2>What should happen:</h2>
+    <ul>
+        <li>Red warning appears below password field when you click it</li>
+        <li>Security banner appears above the form</li>
+        <li>Extension popup shows security alerts</li>
+        <li>Console logs security warnings</li>
+    </ul>
+</body>
+</html>

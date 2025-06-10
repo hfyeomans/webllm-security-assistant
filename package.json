@@ -1,0 +1,18 @@
+{
+  "name": "webllm-security-extension",
+  "version": "1.0.0",
+  "description": "Chrome extension with WebLLM for cybersecurity analysis",
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.46"
+  },
+  "devDependencies": {
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4",
+    "copy-webpack-plugin": "^11.0.0"
+  }
+}

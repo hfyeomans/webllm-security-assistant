@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebLLM Security Assistant</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🛡️ Security Assistant</h1>
+      <div class="status" id="status">Initializing...</div>
+    </header>
+    
+    <div class="chat-container" id="chatContainer">
+      <div class="messages" id="messages"></div>
+      <div class="input-area">
+        <textarea 
+          id="messageInput" 
+          placeholder="Ask about security threats, analyze URLs, or request cybersecurity guidance..."
+          rows="2"
+        ></textarea>
+        <button id="sendButton" disabled>Send</button>
+      </div>
+    </div>
+    
+    <div class="model-info">
+      <small id="modelInfo">Model: Loading...</small>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

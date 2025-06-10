@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "WebLLM Security Assistant",
+  "version": "1.0.0",
+  "description": "AI-powered cybersecurity assistant using WebLLM for threat analysis and security validation",
+  
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "offscreen"
+  ],
+  
+  "host_permissions": [
+    "https://huggingface.co/*",
+    "https://cdn.jsdelivr.net/*"
+  ],
+  
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "WebLLM Security Assistant"
+  },
+  
+  
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["*.wasm", "*.data"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

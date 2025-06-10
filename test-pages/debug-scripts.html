@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Script Detection</title>
+</head>
+<body>
+    <h1>Debug Script Detection Test</h1>
+    
+    <div id="debug-info">
+        <h2>Debug Information:</h2>
+        <div id="script-list"></div>
+        <div id="detection-log"></div>
+    </div>
+    
+    <!-- These scripts will be in the DOM regardless of whether they load -->
+    <script src="http://malicious-cdn.example.com/script.js"></script>
+    <script src="http://192.168.1.100/payload.js"></script>
+    <script src="https://bit.ly/suspicious-script"></script>
+    <script src="https://a1b2c3d4e5f6g7h8i9j0k1l2.com/script.js"></script>
+    <script src="https://phishing-site.com/malware.js"></script>
+    
+    <!-- Debug script to show what's in the DOM -->
+    <script>
+        window.addEventListener('load', function() {
+            const scripts = document.querySelectorAll('script[src]');
+            const scriptList = document.getElementById('script-list');
+            const log = document.getElementById('detection-log');
+            
+            scriptList.innerHTML = '<h3>Scripts found in DOM:</h3>';
+            scripts.forEach((script, index) => {
+                scriptList.innerHTML += `<p>${index + 1}. ${script.src}</p>`;
+            });
+            
+            log.innerHTML = '<h3>Detection Log:</h3>';
+            log.innerHTML += '<p>Check browser console (F12) for security extension logs</p>';
+            log.innerHTML += '<p>Total scripts with src attribute: ' + scripts.length + '</p>';
+            
+            // Manual test of suspicious URL detection
+            console.log('=== Manual URL Testing ===');
+            const testUrls = [
+                'http://malicious-cdn.example.com/script.js',
+                'http://192.168.1.100/payload.js',
+                'https://bit.ly/suspicious-script',
+                'https://a1b2c3d4e5f6g7h8i9j0k1l2.com/script.js',
+                'https://phishing-site.com/malware.js'
+            ];
+            
+            testUrls.forEach(url => {
+                console.log('Testing URL:', url);
+            });
+        });
+    </script>
+    
+    <!-- Suspicious links for comparison -->
+    <h2>Suspicious Links (should be detected):</h2>
+    <a href="http://virus-scanner.exe.com">Click for free virus scan!</a><br>
+    <a href="https://t.co/suspicious">Shortened malicious link</a><br>
+    <a href="http://192.168.1.50/phishing">IP-based phishing</a><br>
+    
+</body>
+</html>

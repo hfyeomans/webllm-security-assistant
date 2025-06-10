@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Extension Test</title>
+</head>
+<body>
+    <h1>Extension Detection Test</h1>
+    
+    <!-- Simple test scripts that should definitely be detected -->
+    <script src="http://bit.ly/test"></script>
+    <script src="http://192.168.1.1/test.js"></script>
+    <script src="http://example.com/test.js"></script>
+    
+    <div id="results">
+        <p>Check the browser console (F12) for extension activity</p>
+        <p>Expected logs:</p>
+        <ul>
+            <li>"Starting security analysis of page: ..."</li>
+            <li>"Analyzing page for suspicious elements..."</li>
+            <li>"Found X external scripts to analyze"</li>
+            <li>"Analyzing script source: ..."</li>
+            <li>"Suspicious pattern matched: ..."</li>
+        </ul>
+    </div>
+    
+    <script>
+        // Log what scripts are actually in the DOM
+        console.log('=== PAGE DEBUG ===');
+        console.log('Page loaded, checking for scripts...');
+        const scripts = document.querySelectorAll('script[src]');
+        console.log('Scripts found:', scripts.length);
+        scripts.forEach(script => {
+            console.log('Script src:', script.src);
+        });
+        
+        // Check if extension content script is running
+        console.log('Extension should analyze this page...');
+        
+        // Try to trigger the extension analysis manually
+        setTimeout(() => {
+            console.log('If you see this but no extension logs, the content script may not be injected');
+        }, 1000);
+    </script>
+    
+</body>
+</html>
